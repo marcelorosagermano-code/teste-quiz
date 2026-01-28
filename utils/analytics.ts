@@ -106,7 +106,7 @@ export const getAnalyticsData = async () => {
     try {
       const dbRef = ref(db);
       
-      // Promessa de timeout para evitar que o app trave se o Firebase não responder
+      // Promessa de timeout para evitar que o app trave se o Firebase não responder em 3 segundos
       const timeoutPromise = new Promise<never>((_, reject) => 
         setTimeout(() => reject(new Error("Timeout ao conectar com Firebase")), 3000)
       );
