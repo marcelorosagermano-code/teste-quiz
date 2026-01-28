@@ -105,12 +105,23 @@ export const getAnalyticsData = async () => {
   if (db) {
     try {
       const dbRef = ref(db);
-      const snapshot = await get(child(dbRef, `events`));
+      
+      // Promessa de timeout para evitar que o app trave se o Firebase não responder
+      const timeoutPromise = new Promise<never>((_, reject) => 
+        setTimeout(() => reject(new Error("Timeout ao conectar com Firebase")), 3000)
+      );
+      
+      const snapshotPromise = get(child(dbRef, `events`));
+      
+      // Corrida entre o fetch e o timeout
+      const snapshot: any = await Promise.race([snapshotPromise, timeoutPromise]);
+
       if (snapshot.exists()) {
         const data = snapshot.val();
         events = Object.values(data);
       }
     } catch (e) {
+      console.warn("Falha ao buscar dados online ou timeout, usando cache local.", e);
       events = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
     }
   } else {
