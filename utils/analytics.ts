@@ -6,26 +6,23 @@ import { getDatabase, ref, push, get, child } from 'firebase/database';
 // CONFIGURAÇÃO DO FIREBASE
 // ------------------------------------------------------------------
 
-// Chave da API (Decodificação simples para evitar bloqueios automáticos de scanners)
-const getKey = () => {
-    try {
-        const prefix = atob("QUl6YQ=="); // AIza
-        const suffix = "SyAh8Dx6LAnK2YsjTSgbcNKCU1TeHTCRmAc";
-        return `${prefix}${suffix}`;
-    } catch (e) {
-        return "AIzaSyAh8Dx6LAnK2YsjTSgbcNKCU1TeHTCRmAc"; // Fallback direto
-    }
+// Tenta ler do Vercel (import.meta.env) ou usa o valor fixo (que você forneceu) como fallback.
+const getEnv = (key: string, fallback: string) => {
+  // O uso de (import.meta as any) evita erros de TypeScript se o types não estiver configurado
+  return (import.meta as any).env?.[key] || fallback;
 };
 
+// Seus dados reais estão configurados aqui como padrão.
+// Se as variáveis VITE_... não existirem no Vercel, o site usará estes valores automaticamente.
 const FIREBASE_CONFIG: any = {
-  apiKey: getKey(),
-  authDomain: "dados-quis-moldes.firebaseapp.com",
-  databaseURL: "https://dados-quis-moldes-default-rtdb.firebaseio.com", // Obrigatório para Realtime Database
-  projectId: "dados-quis-moldes",
-  storageBucket: "dados-quis-moldes.firebasestorage.app",
-  messagingSenderId: "254152829601",
-  appId: "1:254152829601:web:1b6abed86d4973b5299ee0",
-  measurementId: "G-E3MMSHVQR6"
+  apiKey: getEnv("VITE_FIREBASE_API_KEY", "AIzaSyAh8Dx6LAnK2YsjTSgbcNKCU1TeHTCRmAc"),
+  authDomain: getEnv("VITE_FIREBASE_AUTH_DOMAIN", "dados-quis-moldes.firebaseapp.com"),
+  databaseURL: getEnv("VITE_FIREBASE_DATABASE_URL", "https://dados-quis-moldes-default-rtdb.firebaseio.com"),
+  projectId: getEnv("VITE_FIREBASE_PROJECT_ID", "dados-quis-moldes"),
+  storageBucket: getEnv("VITE_FIREBASE_STORAGE_BUCKET", "dados-quis-moldes.firebasestorage.app"),
+  messagingSenderId: getEnv("VITE_FIREBASE_MESSAGING_SENDER_ID", "254152829601"),
+  appId: getEnv("VITE_FIREBASE_APP_ID", "1:254152829601:web:1b6abed86d4973b5299ee0"),
+  measurementId: getEnv("VITE_FIREBASE_MEASUREMENT_ID", "G-E3MMSHVQR6")
 };
 
 let db: any = null;
@@ -35,11 +32,10 @@ if (FIREBASE_CONFIG.apiKey) {
   try {
     const app = initializeApp(FIREBASE_CONFIG);
     // Inicializa o Realtime Database
-    // Nota: É crucial que a URL do banco esteja correta no FIREBASE_CONFIG
     db = getDatabase(app);
-    console.log("Firebase conectado com sucesso.");
+    console.log("Firebase inicializado.");
   } catch (e) {
-    console.warn("Modo Offline (Erro Firebase):", e);
+    console.warn("Aviso: Falha ao inicializar Firebase (Modo Offline ativado).", e);
     db = null;
   }
 }
@@ -48,7 +44,7 @@ export const isFirebaseConfigured = () => !!db;
 
 // --- FUNÇÃO DE TESTE DE CONEXÃO ---
 export const testConnection = async (): Promise<{ success: boolean; message: string }> => {
-  if (!db) return { success: false, message: "Firebase não está inicializado (verifique logs)." };
+  if (!db) return { success: false, message: "Firebase não está inicializado." };
   
   try {
     // Tenta escrever um dado simples de teste
@@ -58,11 +54,12 @@ export const testConnection = async (): Promise<{ success: boolean; message: str
       agent: navigator.userAgent,
       status: 'online'
     });
-    return { success: true, message: "Conexão OK! Banco de dados respondendo." };
+    return { success: true, message: "Conexão OK! Banco de dados conectado e escrevendo." };
   } catch (e: any) {
     console.error("Erro teste de conexão:", e);
     let errorMsg = e.message || 'Erro desconhecido';
-    if (errorMsg.includes('permission_denied')) errorMsg = 'Permissão negada (Verifique as Regras de Segurança)';
+    if (errorMsg.includes('permission_denied')) errorMsg = 'Permissão negada (Verifique Regras no Firebase Console)';
+    if (errorMsg.includes('network error') || errorMsg.includes('Failed to fetch')) errorMsg = 'Erro de Rede (Verifique "Authorized Domains" no Firebase)';
     return { success: false, message: `Falha: ${errorMsg}` };
   }
 };
@@ -115,7 +112,7 @@ export const trackEvent = async (eventName: AnalyticsEvent['eventName'], stepId?
       // Fire and forget para não bloquear a UI
       push(eventsRef, event).catch(err => console.warn("Falha no push async:", err));
     } catch (e) {
-      console.warn("Erro ao tentar enviar evento:", e);
+      console.warn("Erro ao tentar enviar evento (Firebase):", e);
     }
   }
 };
