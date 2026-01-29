@@ -4,9 +4,10 @@ import {
 } from 'recharts';
 import { 
   Users, Target, TrendingDown, MousePointerClick, 
-  RefreshCw, Trash2, ArrowLeft, Activity, Database, AlertCircle
+  RefreshCw, Trash2, ArrowLeft, Activity, Database, AlertCircle,
+  Wifi, WifiOff
 } from 'lucide-react';
-import { getAnalyticsData, generateMockData, clearData, isFirebaseConfigured } from '../utils/analytics';
+import { getAnalyticsData, generateMockData, clearData, isFirebaseConfigured, testConnection } from '../utils/analytics';
 
 interface AdminDashboardProps {
   onClose: () => void;
@@ -16,6 +17,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose }) => {
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [usingFirebase, setUsingFirebase] = useState(false);
+  const [connectionStatus, setConnectionStatus] = useState<{success: boolean, message: string} | null>(null);
 
   // Carrega os dados (pode vir do LocalStorage ou Firebase)
   const loadData = async () => {
@@ -29,6 +31,14 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose }) => {
     } finally {
         setLoading(false);
     }
+  };
+
+  const handleTestConnection = async () => {
+    setConnectionStatus({ success: false, message: "Testando conexão..." });
+    const result = await testConnection();
+    setConnectionStatus(result);
+    // Remove a mensagem após 5 segundos
+    setTimeout(() => setConnectionStatus(null), 5000);
   };
 
   useEffect(() => {
@@ -47,6 +57,14 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose }) => {
 
   return (
     <div className="min-h-screen bg-slate-100 p-4 md:p-8 font-sans">
+      {/* Notificação de Status de Conexão */}
+      {connectionStatus && (
+        <div className={`fixed bottom-4 right-4 p-4 rounded-xl shadow-2xl z-50 flex items-center gap-3 animate-bounce-short ${connectionStatus.success ? 'bg-green-100 text-green-800 border border-green-200' : 'bg-red-100 text-red-800 border border-red-200'}`}>
+            {connectionStatus.success ? <Wifi size={20} /> : <WifiOff size={20} />}
+            <span className="font-bold text-sm">{connectionStatus.message}</span>
+        </div>
+      )}
+
       {/* Header */}
       <div className="max-w-7xl mx-auto mb-8 flex flex-col md:flex-row justify-between items-center gap-4">
         <div>
@@ -75,6 +93,12 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose }) => {
         </div>
         
         <div className="flex gap-3">
+            <button 
+                onClick={handleTestConnection}
+                className="flex items-center px-4 py-2 bg-white border border-blue-200 rounded-lg text-blue-600 hover:bg-blue-50 text-sm font-medium shadow-sm"
+            >
+                <Wifi size={14} className="mr-2" /> Testar Conexão
+            </button>
             <button 
                 onClick={() => { generateMockData(); setTimeout(loadData, 500); }}
                 className="flex items-center px-4 py-2 bg-white border border-slate-300 rounded-lg text-slate-700 hover:bg-slate-50 text-sm font-medium shadow-sm"

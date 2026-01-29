@@ -35,16 +35,36 @@ let db: any = null;
 // Inicializa o Firebase
 if (FIREBASE_CONFIG.apiKey) {
   try {
+    // Tenta inicializar apenas se as dependências estiverem corretas
     const app = initializeApp(FIREBASE_CONFIG);
     db = getDatabase(app, FIREBASE_CONFIG.databaseURL);
-    console.log("Database online.");
+    console.log("Firebase inicializado.");
   } catch (e) {
-    console.error("Modo offline.", e);
+    console.warn("Modo Offline (Erro Firebase):", e);
     db = null;
   }
 }
 
 export const isFirebaseConfigured = () => !!db;
+
+// --- FUNÇÃO DE TESTE DE CONEXÃO ---
+export const testConnection = async (): Promise<{ success: boolean; message: string }> => {
+  if (!db) return { success: false, message: "Firebase não está inicializado na aplicação (Verifique console)." };
+  
+  try {
+    // Tenta escrever um dado simples
+    const testRef = ref(db, '_connection_test');
+    await push(testRef, { 
+      timestamp: Date.now(), 
+      agent: navigator.userAgent,
+      status: 'check_ok'
+    });
+    return { success: true, message: "Conexão ESTÁVEL! Gravação realizada com sucesso." };
+  } catch (e: any) {
+    console.error("Erro teste:", e);
+    return { success: false, message: `Falha na conexão: ${e.message || 'Erro desconhecido'}` };
+  }
+};
 
 export interface AnalyticsEvent {
   id: string;
@@ -91,9 +111,10 @@ export const trackEvent = async (eventName: AnalyticsEvent['eventName'], stepId?
   if (db) {
     try {
       const eventsRef = ref(db, 'events');
-      await push(eventsRef, event);
+      // Não usamos await aqui para não bloquear a UI do usuário
+      push(eventsRef, event).catch(err => console.warn("Falha no push async:", err));
     } catch (e) {
-      // Falha silenciosa
+      console.warn("Erro ao tentar enviar evento:", e);
     }
   }
 };
@@ -102,13 +123,14 @@ export const trackEvent = async (eventName: AnalyticsEvent['eventName'], stepId?
 export const getAnalyticsData = async () => {
   let events: AnalyticsEvent[] = [];
 
+  // Tenta buscar do Firebase se estiver disponível
   if (db) {
     try {
       const dbRef = ref(db);
       
-      // Promessa de timeout para evitar que o app trave se o Firebase não responder em 3 segundos
+      // Promessa de timeout rigorosa de 2 segundos para não travar
       const timeoutPromise = new Promise<never>((_, reject) => 
-        setTimeout(() => reject(new Error("Timeout ao conectar com Firebase")), 3000)
+        setTimeout(() => reject(new Error("Timeout Firebase")), 2000)
       );
       
       const snapshotPromise = get(child(dbRef, `events`));
@@ -121,12 +143,17 @@ export const getAnalyticsData = async () => {
         events = Object.values(data);
       }
     } catch (e) {
-      console.warn("Falha ao buscar dados online ou timeout, usando cache local.", e);
+      console.warn("Fallback: Usando dados locais devido a erro/timeout.", e);
+      // Em caso de erro, GARANTE que vamos ler do localStorage
       events = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
     }
   } else {
+    // Modo Offline explícito
     events = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
   }
+
+  // --- Se ainda não tiver eventos (ex: erro no parse local), garante array vazio ---
+  if (!Array.isArray(events)) events = [];
 
   // --- Lógica de Processamento dos Dados ---
   const totalVisits = events.filter(e => e.eventName === 'visit').length;
