@@ -5,7 +5,7 @@ import {
 import { 
   Users, Target, TrendingDown, MousePointerClick, 
   RefreshCw, Trash2, ArrowLeft, Activity, Database, AlertCircle,
-  Wifi, WifiOff
+  Wifi, WifiOff, Loader2
 } from 'lucide-react';
 import { getAnalyticsData, generateMockData, clearData, isFirebaseConfigured, testConnection } from '../utils/analytics';
 
@@ -17,7 +17,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose }) => {
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [usingFirebase, setUsingFirebase] = useState(false);
-  const [connectionStatus, setConnectionStatus] = useState<{success: boolean, message: string} | null>(null);
+  const [connectionStatus, setConnectionStatus] = useState<{type: 'loading' | 'success' | 'error', message: string} | null>(null);
 
   // Carrega os dados (pode vir do LocalStorage ou Firebase)
   const loadData = async () => {
@@ -34,9 +34,15 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose }) => {
   };
 
   const handleTestConnection = async () => {
-    setConnectionStatus({ success: false, message: "Testando conexão..." });
+    setConnectionStatus({ type: 'loading', message: "Testando conexão..." });
+    
     const result = await testConnection();
-    setConnectionStatus(result);
+    
+    setConnectionStatus({
+        type: result.success ? 'success' : 'error',
+        message: result.message
+    });
+
     // Remove a mensagem após 5 segundos
     setTimeout(() => setConnectionStatus(null), 5000);
   };
@@ -55,12 +61,25 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose }) => {
 
   if (!data) return <div className="p-10 text-center">Sem dados disponíveis.</div>;
 
+  // Helper para cores do status
+  const getStatusColor = () => {
+      if (connectionStatus?.type === 'loading') return 'bg-blue-100 text-blue-800 border-blue-200';
+      if (connectionStatus?.type === 'success') return 'bg-green-100 text-green-800 border-green-200';
+      return 'bg-red-100 text-red-800 border-red-200';
+  };
+
+  const getStatusIcon = () => {
+      if (connectionStatus?.type === 'loading') return <Loader2 size={20} className="animate-spin" />;
+      if (connectionStatus?.type === 'success') return <Wifi size={20} />;
+      return <WifiOff size={20} />;
+  };
+
   return (
     <div className="min-h-screen bg-slate-100 p-4 md:p-8 font-sans">
       {/* Notificação de Status de Conexão */}
       {connectionStatus && (
-        <div className={`fixed bottom-4 right-4 p-4 rounded-xl shadow-2xl z-50 flex items-center gap-3 animate-bounce-short ${connectionStatus.success ? 'bg-green-100 text-green-800 border border-green-200' : 'bg-red-100 text-red-800 border border-red-200'}`}>
-            {connectionStatus.success ? <Wifi size={20} /> : <WifiOff size={20} />}
+        <div className={`fixed bottom-4 right-4 p-4 rounded-xl shadow-2xl z-50 flex items-center gap-3 animate-bounce-short border ${getStatusColor()}`}>
+            {getStatusIcon()}
             <span className="font-bold text-sm">{connectionStatus.message}</span>
         </div>
       )}
@@ -95,7 +114,8 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose }) => {
         <div className="flex gap-3">
             <button 
                 onClick={handleTestConnection}
-                className="flex items-center px-4 py-2 bg-white border border-blue-200 rounded-lg text-blue-600 hover:bg-blue-50 text-sm font-medium shadow-sm"
+                disabled={connectionStatus?.type === 'loading'}
+                className="flex items-center px-4 py-2 bg-white border border-blue-200 rounded-lg text-blue-600 hover:bg-blue-50 text-sm font-medium shadow-sm disabled:opacity-50"
             >
                 <Wifi size={14} className="mr-2" /> Testar Conexão
             </button>

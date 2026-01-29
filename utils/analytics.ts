@@ -49,17 +49,30 @@ export const testConnection = async (): Promise<{ success: boolean; message: str
   try {
     // Tenta escrever um dado simples de teste
     const testRef = ref(db, '_connection_test');
-    await push(testRef, { 
+    
+    // Adiciona um Timeout de 5 segundos. Se o Firebase não responder, lança erro.
+    const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error("Timeout: O servidor demorou para responder.")), 5000)
+    );
+
+    const pushPromise = push(testRef, { 
       timestamp: Date.now(), 
       agent: navigator.userAgent,
       status: 'online'
     });
+
+    // Corrida entre o push e o timeout
+    await Promise.race([pushPromise, timeoutPromise]);
+
     return { success: true, message: "Conexão OK! Banco de dados conectado e escrevendo." };
   } catch (e: any) {
     console.error("Erro teste de conexão:", e);
     let errorMsg = e.message || 'Erro desconhecido';
+    
     if (errorMsg.includes('permission_denied')) errorMsg = 'Permissão negada (Verifique Regras no Firebase Console)';
-    if (errorMsg.includes('network error') || errorMsg.includes('Failed to fetch')) errorMsg = 'Erro de Rede (Verifique "Authorized Domains" no Firebase)';
+    if (errorMsg.includes('network error') || errorMsg.includes('Failed to fetch')) errorMsg = 'Erro de Rede (Verifique sua internet)';
+    if (errorMsg.includes('Timeout')) errorMsg = 'Lentidão: O servidor não respondeu a tempo.';
+
     return { success: false, message: `Falha: ${errorMsg}` };
   }
 };
